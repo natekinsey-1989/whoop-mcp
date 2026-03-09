@@ -5,7 +5,6 @@ import { createWhoopMcpServer } from "./src/server";
 const app = express();
 app.use(express.json());
 
-// In-memory token storage
 let storedAccessToken: string | null = process.env.WHOOP_ACCESS_TOKEN || null;
 let storedRefreshToken: string | null = process.env.WHOOP_REFRESH_TOKEN || null;
 let tokenExpiresAt: number = 0;
@@ -19,17 +18,17 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (!storedRefreshToken) return null;
   const clientId = process.env.WHOOP_CLIENT_ID!;
   const clientSecret = process.env.WHOOP_CLIENT_SECRET!;
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
   const response = await fetch("https://api.prod.whoop.com/oauth/oauth2/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      "Authorization": `Basic ${credentials}`,
     },
     body: new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: storedRefreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
     }),
   });
 
@@ -41,7 +40,6 @@ export async function refreshAccessToken(): Promise<string | null> {
   return storedAccessToken;
 }
 
-// Auth URL - visit this to authorize
 app.get("/auth", (req, res) => {
   const clientId = process.env.WHOOP_CLIENT_ID!;
   const redirectUri = `https://whoop-mcp-production-04c1.up.railway.app/callback`;
@@ -51,14 +49,13 @@ app.get("/auth", (req, res) => {
   res.redirect(authUrl);
 });
 
-// OAuth callback - Whoop redirects here after authorization
 app.get("/callback", async (req, res) => {
   const code = req.query.code as string;
   const error = req.query.error as string;
 
   if (error) {
     return res.status(400).send(`
-      <h1>❌ Authorization Error</h1>
+      <h1>Authorization Error</h1>
       <p><strong>Error:</strong> ${error}</p>
       <p><strong>Description:</strong> ${req.query.error_description || "Unknown error"}</p>
       <p><a href="/auth">Try again</a></p>
@@ -67,7 +64,7 @@ app.get("/callback", async (req, res) => {
 
   if (!code) {
     return res.status(400).send(`
-      <h1>❌ Missing Authorization Code</h1>
+      <h1>Missing Authorization Code</h1>
       <p>No authorization code was received from Whoop.</p>
       <p><a href="/auth">Try again</a></p>
     `);
@@ -76,26 +73,26 @@ app.get("/callback", async (req, res) => {
   const clientId = process.env.WHOOP_CLIENT_ID!;
   const clientSecret = process.env.WHOOP_CLIENT_SECRET!;
   const redirectUri = `https://whoop-mcp-production-04c1.up.railway.app/callback`;
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
   try {
     const response = await fetch("https://api.prod.whoop.com/oauth/oauth2/token", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": `Basic ${credentials}`,
       },
       body: new URLSearchParams({
         grant_type: "authorization_code",
         code,
         redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       return res.status(400).send(`
-        <h1>❌ Token Exchange Failed</h1>
+        <h1>Token Exchange Failed</h1>
         <p>${response.status}: ${errorText}</p>
         <p><a href="/auth">Try again</a></p>
       `);
@@ -107,24 +104,23 @@ app.get("/callback", async (req, res) => {
     tokenExpiresAt = Date.now() + data.expires_in * 1000;
 
     res.send(`
-      <h1>✅ Whoop Connected Successfully!</h1>
+      <h1>Whoop Connected Successfully!</h1>
       <p>Your access token is stored and the MCP server is ready.</p>
       <hr/>
-      <p><strong>Save this refresh token to Railway as WHOOP_REFRESH_TOKEN</strong> so it persists after restarts:</p>
-      <code style="word-break:break-all;background:#f0f0f0;padding:10px;display:block;">${storedRefreshToken}</code>
+      <p><strong>Save this to Railway as WHOOP_REFRESH_TOKEN:</strong></p>
+      <code style="word-break:break-all;background:#f0f0f0;padding:10px;display:block;margin:10px 0;">${storedRefreshToken}</code>
       <hr/>
       <p>You can now close this window and use Claude to pull your Whoop data.</p>
     `);
   } catch (err) {
     res.status(500).send(`
-      <h1>❌ Server Error</h1>
+      <h1>Server Error</h1>
       <p>${err}</p>
       <p><a href="/auth">Try again</a></p>
     `);
   }
 });
 
-// MCP endpoint
 app.post("/mcp", async (req, res) => {
   const mcpAuthToken =
     (req.query.mcpAuthToken as string) || process.env.MCP_AUTH_TOKEN;
