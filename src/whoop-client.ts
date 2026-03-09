@@ -15,9 +15,16 @@ export class WhoopClient {
   async login(): Promise<void> {
     const clientId = process.env.WHOOP_CLIENT_ID;
     const clientSecret = process.env.WHOOP_CLIENT_SECRET;
+    const refreshToken = process.env.WHOOP_REFRESH_TOKEN;
 
     if (!clientId || !clientSecret) {
       throw new Error("WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET are required");
+    }
+
+    if (!refreshToken) {
+      throw new Error(
+        "WHOOP_REFRESH_TOKEN not set. Visit https://whoop-mcp-production-04c1.up.railway.app/auth to authorize."
+      );
     }
 
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -29,16 +36,20 @@ export class WhoopClient {
         "Authorization": `Basic ${credentials}`,
       },
       body: new URLSearchParams({
-        grant_type: "client_credentials",
-        scope: "read:recovery read:cycles read:sleep read:workout read:profile read:body_measurement",
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OAuth login failed: ${response.status} ${response.statusText}`);
+      const error = await response.text();
+      throw new Error(`OAuth token refresh failed: ${response.status} - ${error}`);
     }
 
     const data = await response.json();
+
+    // Update the env variable in memory for this session
+    process.env.WHOOP_REFRESH_TOKEN = data.refresh_token;
 
     this.tokenData = {
       accessToken: data.access_token,
@@ -96,6 +107,7 @@ export class WhoopClient {
         if (!response.ok) {
           if (response.status === 401 && !retried) {
             retried = true;
+            this.tokenData = null;
             await this.login();
             continue;
           }
@@ -109,6 +121,7 @@ export class WhoopClient {
           throw error;
         }
         retried = true;
+        this.tokenData = null;
         await this.login();
       }
     }
@@ -132,6 +145,7 @@ export class WhoopClient {
         if (!response.ok) {
           if (response.status === 401 && !retried) {
             retried = true;
+            this.tokenData = null;
             await this.login();
             continue;
           }
@@ -145,6 +159,7 @@ export class WhoopClient {
           throw error;
         }
         retried = true;
+        this.tokenData = null;
         await this.login();
       }
     }
@@ -168,6 +183,7 @@ export class WhoopClient {
         if (!response.ok) {
           if (response.status === 401 && !retried) {
             retried = true;
+            this.tokenData = null;
             await this.login();
             continue;
           }
@@ -181,6 +197,7 @@ export class WhoopClient {
           throw error;
         }
         retried = true;
+        this.tokenData = null;
         await this.login();
       }
     }
@@ -204,6 +221,7 @@ export class WhoopClient {
         if (!response.ok) {
           if (response.status === 401 && !retried) {
             retried = true;
+            this.tokenData = null;
             await this.login();
             continue;
           }
@@ -217,6 +235,7 @@ export class WhoopClient {
           throw error;
         }
         retried = true;
+        this.tokenData = null;
         await this.login();
       }
     }
@@ -240,6 +259,7 @@ export class WhoopClient {
         if (!response.ok) {
           if (response.status === 401 && !retried) {
             retried = true;
+            this.tokenData = null;
             await this.login();
             continue;
           }
@@ -253,6 +273,7 @@ export class WhoopClient {
           throw error;
         }
         retried = true;
+        this.tokenData = null;
         await this.login();
       }
     }
