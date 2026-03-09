@@ -2,6 +2,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express from "express";
 import { createWhoopMcpServer } from "./src/server";
 
+
 const app = express();
 app.use(express.json());
 
