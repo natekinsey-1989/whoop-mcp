@@ -1,5 +1,7 @@
 # Whoop MCP Server
 
+force rebuild
+
 A Model Context Protocol (MCP) server for accessing Whoop fitness data. Integrate your WHOOP biometric data into Claude, LLMs, and other MCP-compatible applications.
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/F1iI46?referralCode=I5P95N&utm_medium=integration&utm_source=template&utm_campaign=generic)
