@@ -1,18 +1,15 @@
 import type {
-  WhoopConfig,
   WhoopHeaders,
   HomeResponse,
   TokenData,
 } from "./types";
 
 export class WhoopClient {
-  private config: WhoopConfig;
   private baseUrl: string;
   private tokenData: TokenData | null = null;
 
-  constructor(config: WhoopConfig) {
-    this.config = config;
-    this.baseUrl = config.baseUrl || "https://api.prod.whoop.com";
+  constructor() {
+    this.baseUrl = "https://api.prod.whoop.com";
   }
 
   async login(): Promise<void> {
