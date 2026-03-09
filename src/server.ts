@@ -6,10 +6,7 @@ import { registerRecoveryTools } from "./tools/recovery";
 import { registerStrainTools } from "./tools/strain";
 import { registerHealthspanTools } from "./tools/healthspan";
 
-export interface WhoopMcpServerConfig {
-  email?: string;
-  password?: string;
-}
+export interface WhoopMcpServerConfig {}
 
 export function createWhoopMcpServer(config: WhoopMcpServerConfig) {
   const server = new McpServer({
@@ -17,8 +14,7 @@ export function createWhoopMcpServer(config: WhoopMcpServerConfig) {
     version: "1.0.0",
   });
 
-  const whoopClient = new WhoopClient(config);
-
+  const whoopClient = new WhoopClient();
   registerHomeTools(server, whoopClient);
   registerSleepTools(server, whoopClient);
   registerRecoveryTools(server, whoopClient);
