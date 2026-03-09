@@ -167,8 +167,3 @@ app.listen(port, () => {
   console.error("Server error:", error);
   process.exit(1);
 });
-```
-
-Commit this, wait for Railway to redeploy, then visit:
-```
-https://whoop-mcp-production-04c1.up.railway.app/auth
