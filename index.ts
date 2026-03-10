@@ -21,8 +21,8 @@ async function saveTokenToRailway(accessToken: string): Promise<void> {
   if (!railwayToken || !serviceId || !environmentId) return;
 
   const mutation = `
-    mutation UpsertVariables($input: ServiceVariablesUpsertInput!) {
-      serviceVariablesUpsert(input: $input)
+    mutation VariableUpsert($input: VariableUpsertInput!) {
+      variableUpsert(input: $input)
     }
   `;
 
@@ -39,7 +39,8 @@ async function saveTokenToRailway(accessToken: string): Promise<void> {
           input: {
             serviceId,
             environmentId,
-            variables: { WHOOP_ACCESS_TOKEN: accessToken },
+            name: "WHOOP_ACCESS_TOKEN",
+            value: accessToken,
           },
         },
       }),
