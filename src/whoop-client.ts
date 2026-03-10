@@ -1,7 +1,8 @@
-import type { WhoopHeaders, HomeResponse, TokenData } from "./types";
+import type { WhoopHeaders, TokenData } from "./types";
 import { readFileSync, writeFileSync } from "fs";
 
 const TOKEN_FILE = "/tmp/whoop_token.json";
+const BASE_URL = "https://api.prod.whoop.com/developer";
 
 export function saveTokenToFile(accessToken: string, expiresAt: number): void {
   try {
@@ -11,47 +12,27 @@ export function saveTokenToFile(accessToken: string, expiresAt: number): void {
   }
 }
 
-function loadTokenFromFile(): TokenData | null {
-  try {
-    const raw = readFileSync(TOKEN_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    if (parsed.accessToken && parsed.expiresAt > Date.now()) {
-      return parsed;
-    }
-  } catch (_) {}
-  return null;
-}
-
 export class WhoopClient {
-  private baseUrl: string;
   private tokenData: TokenData | null = null;
 
-  constructor() {
-    this.baseUrl = "https://api.prod.whoop.com";
-  }
+  constructor() {}
 
   async login(): Promise<void> {
-    // Always try env var first — it's the freshest token after a redeploy
     const accessToken = process.env.WHOOP_ACCESS_TOKEN;
     if (accessToken) {
-      this.tokenData = {
-        accessToken,
-        expiresAt: Date.now() + 3600 * 1000,
-      };
+      this.tokenData = { accessToken, expiresAt: Date.now() + 3600 * 1000 };
       saveTokenToFile(accessToken, this.tokenData.expiresAt);
       return;
     }
-
-    // Fall back to file if env var not set
-    const fileToken = loadTokenFromFile();
-    if (fileToken) {
-      this.tokenData = fileToken;
-      return;
-    }
-
-    throw new Error(
-      "No valid token. Visit https://whoop-mcp-production-04c1.up.railway.app/auth to authorize."
-    );
+    try {
+      const raw = readFileSync(TOKEN_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (parsed.accessToken && parsed.expiresAt > Date.now()) {
+        this.tokenData = parsed;
+        return;
+      }
+    } catch (_) {}
+    throw new Error("No valid token. Visit https://whoop-mcp-production-04c1.up.railway.app/auth to authorize.");
   }
 
   private async ensureValidToken(): Promise<void> {
@@ -61,107 +42,61 @@ export class WhoopClient {
     }
   }
 
-  private async getHeaders(): Promise<WhoopHeaders> {
+  private async get(path: string): Promise<any> {
     await this.ensureValidToken();
-    if (!this.tokenData) throw new Error("No valid authentication token available");
-    return {
-      Host: "api.prod.whoop.com",
-      Authorization: `Bearer ${this.tokenData.accessToken}`,
-      Accept: "*/*",
-      "User-Agent": "iOS",
-      "Content-Type": "application/json",
-      "X-WHOOP-Device-Platform": "iOS",
-      "X-WHOOP-Time-Zone": Intl.DateTimeFormat().resolvedOptions().timeZone,
-      Locale: "en_US",
-      Currency: "USD",
-    };
-  }
-
-  private async fetchWithRetry(url: string): Promise<any> {
-    let retried = false;
-    while (true) {
-      try {
-        const headers = await this.getHeaders();
-        const response = await fetch(url, {
-          method: "GET",
-          headers: Object.fromEntries(
-            Object.entries(headers).map(([k, v]) => [k, v as string])
-          ),
-        });
-        if (!response.ok) {
-          if (response.status === 401 && !retried) {
-            retried = true;
-            this.tokenData = null;
-            await this.login();
-            continue;
-          }
-          throw new Error(`Whoop API error: ${response.status} ${response.statusText}`);
-        }
-        return await response.json();
-      } catch (error) {
-        if (retried || !(error instanceof Error && error.message.includes("401"))) {
-          if (error instanceof Error) throw error;
-          throw new Error("Unknown error fetching Whoop data");
-        }
-        retried = true;
+    const response = await fetch(`${BASE_URL}${path}`, {
+      headers: {
+        Authorization: `Bearer ${this.tokenData!.accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
         this.tokenData = null;
         await this.login();
+        const retry = await fetch(`${BASE_URL}${path}`, {
+          headers: {
+            Authorization: `Bearer ${this.tokenData!.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!retry.ok) throw new Error(`Whoop API error: ${retry.status} ${retry.statusText}`);
+        return retry.json();
       }
+      throw new Error(`Whoop API error: ${response.status} ${response.statusText}`);
     }
+    return response.json();
   }
 
-  async getHomeData(date?: string): Promise<HomeResponse> {
-    const dateParam = date || new Date().toISOString().split("T")[0];
-    return this.fetchWithRetry(`${this.baseUrl}/home-service/v1/home?date=${dateParam}`);
+  async getLatestCycle(): Promise<any> {
+    return this.get("/v2/cycle?limit=1");
   }
 
-  async getSleepDeepDive(date?: string): Promise<any> {
-    const dateParam = date || new Date().toISOString().split("T")[0];
-    return this.fetchWithRetry(`${this.baseUrl}/home-service/v1/deep-dive/sleep?date=${dateParam}`);
+  async getLatestRecovery(): Promise<any> {
+    return this.get("/v2/recovery?limit=1");
   }
 
-  async getRecoveryDeepDive(date?: string): Promise<any> {
-    const dateParam = date || new Date().toISOString().split("T")[0];
-    return this.fetchWithRetry(`${this.baseUrl}/home-service/v1/deep-dive/recovery?date=${dateParam}`);
+  async getLatestSleep(): Promise<any> {
+    return this.get("/v2/activity/sleep?limit=1");
   }
 
-  async getStrainDeepDive(date?: string): Promise<any> {
-    const dateParam = date || new Date().toISOString().split("T")[0];
-    return this.fetchWithRetry(`${this.baseUrl}/home-service/v1/deep-dive/strain?date=${dateParam}`);
+  async getLatestWorkouts(): Promise<any> {
+    return this.get("/v2/activity/workout?limit=5");
   }
 
-  async getHealthspan(date?: string): Promise<any> {
-    const dateParam = date || new Date().toISOString().split("T")[0];
-    return this.fetchWithRetry(`${this.baseUrl}/healthspan-service/v1/healthspan/bff?date=${dateParam}`);
+  async getUserProfile(): Promise<any> {
+    return this.get("/v2/user/profile/basic");
   }
 
-  formatHomeData(data: HomeResponse): string {
-    const metadata = data.metadata;
-    const live = metadata.whoop_live_metadata;
-    const cycle = metadata.cycle_metadata;
-    const lines = [
-      "WHOOP HOME DATA",
-      "══════════════════",
-      "",
-      `Date: ${cycle.cycle_day} (${cycle.cycle_date_display})`,
-      `Cycle ID: ${cycle.cycle_id}`,
-      `Sleep State: ${cycle.sleep_state}`,
-      "",
-      "LIVE METRICS",
-      "───────────────",
-      `  Recovery: ${live.recovery_score}%`,
-      `  Strain: ${live.day_strain.toFixed(1)}`,
-      `  Sleep: ${(live.ms_of_sleep / (1000 * 60 * 60)).toFixed(1)} hours`,
-      `  Calories: ${live.calories}`,
-      "",
-    ];
-    if (data.header?.content?.gauges) {
-      lines.push("SCORES", "─────────");
-      data.header.content.gauges.forEach((gauge) => {
-        lines.push(`  ${gauge.title}: ${gauge.score_display}${gauge.score_display_suffix || ""} (${Math.round(gauge.gauge_fill_percentage * 100)}%)`);
-      });
-      lines.push("");
-    }
-    return lines.join("\n");
+  async getUserBodyMeasurements(): Promise<any> {
+    return this.get("/v2/user/measurement/body");
+  }
+
+  async getRecoveryForCycle(cycleId: number): Promise<any> {
+    return this.get(`/v2/cycle/${cycleId}/recovery`);
+  }
+
+  async getSleepForCycle(cycleId: number): Promise<any> {
+    return this.get(`/v2/cycle/${cycleId}/sleep`);
   }
 }
