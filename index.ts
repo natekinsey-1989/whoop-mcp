@@ -2,7 +2,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express from "express";
 import { createWhoopMcpServer } from "./src/server";
 
-
 const app = express();
 app.use(express.json());
 
@@ -106,12 +105,13 @@ app.get("/callback", async (req, res) => {
 
     res.send(`
       <h1>Whoop Connected Successfully!</h1>
-      <p>Your access token is stored and the MCP server is ready.</p>
+      <p>Full token response from Whoop:</p>
+      <pre style="background:#f0f0f0;padding:10px;word-break:break-all;white-space:pre-wrap;">${JSON.stringify(data, null, 2)}</pre>
       <hr/>
-      <p><strong>Save this to Railway as WHOOP_REFRESH_TOKEN:</strong></p>
+      <p><strong>Access Token (save as WHOOP_ACCESS_TOKEN in Railway):</strong></p>
+      <code style="word-break:break-all;background:#f0f0f0;padding:10px;display:block;margin:10px 0;">${storedAccessToken}</code>
+      <p><strong>Refresh Token (save as WHOOP_REFRESH_TOKEN in Railway):</strong></p>
       <code style="word-break:break-all;background:#f0f0f0;padding:10px;display:block;margin:10px 0;">${storedRefreshToken}</code>
-      <hr/>
-      <p>You can now close this window and use Claude to pull your Whoop data.</p>
     `);
   } catch (err) {
     res.status(500).send(`
