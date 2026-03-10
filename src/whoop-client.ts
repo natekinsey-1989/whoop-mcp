@@ -130,4 +130,36 @@ export class WhoopClient {
 
   async getHealthspan(date?: string): Promise<any> {
     const dateParam = date || new Date().toISOString().split("T")[0];
-    return
+    return this.fetchWithRetry(`${this.baseUrl}/healthspan-service/v1/healthspan/bff?date=${dateParam}`);
+  }
+
+  formatHomeData(data: HomeResponse): string {
+    const metadata = data.metadata;
+    const live = metadata.whoop_live_metadata;
+    const cycle = metadata.cycle_metadata;
+    const lines = [
+      "WHOOP HOME DATA",
+      "══════════════════",
+      "",
+      `Date: ${cycle.cycle_day} (${cycle.cycle_date_display})`,
+      `Cycle ID: ${cycle.cycle_id}`,
+      `Sleep State: ${cycle.sleep_state}`,
+      "",
+      "LIVE METRICS",
+      "───────────────",
+      `  Recovery: ${live.recovery_score}%`,
+      `  Strain: ${live.day_strain.toFixed(1)}`,
+      `  Sleep: ${(live.ms_of_sleep / (1000 * 60 * 60)).toFixed(1)} hours`,
+      `  Calories: ${live.calories}`,
+      "",
+    ];
+    if (data.header?.content?.gauges) {
+      lines.push("SCORES", "─────────");
+      data.header.content.gauges.forEach((gauge) => {
+        lines.push(`  ${gauge.title}: ${gauge.score_display}${gauge.score_display_suffix || ""} (${Math.round(gauge.gauge_fill_percentage * 100)}%)`);
+      });
+      lines.push("");
+    }
+    return lines.join("\n");
+  }
+}
