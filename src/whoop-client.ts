@@ -31,12 +31,7 @@ export class WhoopClient {
   }
 
   async login(): Promise<void> {
-    const fileToken = loadTokenFromFile();
-    if (fileToken) {
-      this.tokenData = fileToken;
-      return;
-    }
-
+    // Always try env var first — it's the freshest token after a redeploy
     const accessToken = process.env.WHOOP_ACCESS_TOKEN;
     if (accessToken) {
       this.tokenData = {
@@ -44,6 +39,13 @@ export class WhoopClient {
         expiresAt: Date.now() + 3600 * 1000,
       };
       saveTokenToFile(accessToken, this.tokenData.expiresAt);
+      return;
+    }
+
+    // Fall back to file if env var not set
+    const fileToken = loadTokenFromFile();
+    if (fileToken) {
+      this.tokenData = fileToken;
       return;
     }
 
