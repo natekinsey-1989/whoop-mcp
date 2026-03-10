@@ -13,49 +13,6 @@ if (storedAccessToken) {
   saveTokenToFile(storedAccessToken, tokenExpiresAt);
 }
 
-async function saveTokenToRailway(accessToken: string): Promise<void> {
-  const railwayToken = process.env.RAILWAY_TOKEN;
-  const serviceId = process.env.RAILWAY_SERVICE_ID;
-  const environmentId = process.env.RAILWAY_ENVIRONMENT_ID;
-
-  if (!railwayToken || !serviceId || !environmentId) return;
-
-  const mutation = `
-    mutation VariableUpsert($input: VariableUpsertInput!) {
-      variableUpsert(input: $input)
-    }
-  `;
-
-  try {
-    const response = await fetch("https://backboard.railway.app/graphql/v2", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${railwayToken}`,
-      },
-      body: JSON.stringify({
-        query: mutation,
-        variables: {
-          input: {
-            serviceId,
-            environmentId,
-            name: "WHOOP_ACCESS_TOKEN",
-            value: accessToken,
-          },
-        },
-      }),
-    });
-    const data = await response.json();
-    if (data.errors) {
-      console.error("Railway API error:", JSON.stringify(data.errors));
-    } else {
-      console.log("WHOOP_ACCESS_TOKEN saved to Railway successfully");
-    }
-  } catch (err) {
-    console.error("Failed to save token to Railway:", err);
-  }
-}
-
 app.get("/auth", (req, res) => {
   const clientId = process.env.WHOOP_CLIENT_ID!;
   const redirectUri = `https://whoop-mcp-production-04c1.up.railway.app/callback`;
@@ -113,14 +70,13 @@ app.get("/callback", async (req, res) => {
     const data = await response.json();
     storedAccessToken = data.access_token;
     tokenExpiresAt = Date.now() + data.expires_in * 1000;
-
     saveTokenToFile(storedAccessToken!, tokenExpiresAt);
-    await saveTokenToRailway(storedAccessToken!);
 
     res.send(`
       <h1>Whoop Connected Successfully!</h1>
-      <p>Token saved to file and Railway. Claude can now pull your Whoop data.</p>
-      <p>Token expires in 1 hour. Visit <a href="/auth">/auth</a> to refresh.</p>
+      <p>Copy this token and save it as <strong>WHOOP_ACCESS_TOKEN</strong> in Railway:</p>
+      <code style="word-break:break-all;background:#f0f0f0;padding:10px;display:block;margin:10px 0;font-size:12px;">${storedAccessToken}</code>
+      <p>Token expires in 1 hour. Visit <a href="/auth">/auth</a> to get a new one.</p>
     `);
   } catch (err) {
     res.status(500).send(`<h1>Server Error</h1><p>${err}</p><p><a href="/auth">Try again</a></p>`);
