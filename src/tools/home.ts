@@ -3,217 +3,197 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WhoopClient } from "../whoop-client";
 
 export function registerHomeTools(server: McpServer, whoopClient: WhoopClient) {
-  server.registerTool(
-    "whoop_get_overview",
-    {
-      title: "Get Whoop Overview",
-      description:
-        "Get comprehensive Whoop data overview including cycle info, live metrics (recovery, strain, sleep, calories), gauges, activities, and key health statistics for a specific date",
-      inputSchema: {
-        date: z
-          .string()
-          .optional()
-          .describe(
-            "Date in YYYY-MM-DD format (defaults to today if not provided)"
-          ),
+    server.registerTool(
+          "whoop_get_overview",
+      {
+              title: "Get Whoop Overview",
+              description: "Get today's Whoop overview: cycle strain, recovery score, HRV, RHR, sleep performance",
+              inputSchema: {},
+              outputSchema: {
+                        cycle: z.object({
+                                    id: z.number(),
+                                    start: z.string(),
+                                    strain: z.number().nullable(),
+                                    kilojoule: z.number().nullable(),
+                                    average_heart_rate: z.number().nullable(),
+                                    score_state: z.string(),
+                        }),
+                        recovery: z.object({
+                                    recovery_score: z.number().nullable(),
+                                    resting_heart_rate: z.number().nullable(),
+                                    hrv_rmssd_milli: z.number().nullable(),
+                                    spo2_percentage: z.number().nullable(),
+                                    skin_temp_celsius: z.number().nullable(),
+                                    score_state: z.string(),
+                        }),
+                        sleep: z.object({
+                                    sleep_performance_percentage: z.number().nullable(),
+                                    total_sleep_hours: z.number().nullable(),
+                                    respiratory_rate: z.number().nullable(),
+                                    score_state: z.string(),
+                        }),
+              },
       },
-      outputSchema: {
-        cycleInfo: z.object({
-          cycleId: z.number(),
-          cycleDay: z.string(),
-          cycleDateDisplay: z.string(),
-          sleepState: z.string(),
-        }),
-        liveMetrics: z.object({
-          recoveryScore: z.number(),
-          dayStrain: z.number(),
-          sleepHours: z.number(),
-          calories: z.number(),
-        }),
-        gauges: z.array(
-          z.object({
-            title: z.string(),
-            scoreDisplay: z.string(),
-            scoreSuffix: z.string().nullable(),
-            fillPercentage: z.number(),
-            progressStyle: z.string(),
-          })
-        ),
-        journal: z.object({
-          completed: z.boolean(),
-          hasRecovery: z.boolean(),
-          enabled: z.boolean(),
-        }),
-        activities: z.array(
-          z.object({
-            title: z.string(),
-            type: z.string(),
-            scoreDisplay: z.string(),
-            startTime: z.string(),
-            endTime: z.string(),
-            status: z.string(),
-          })
-        ),
-        statistics: z.array(
-          z.object({
-            title: z.string(),
-            currentValue: z.string(),
-            thirtyDayAverage: z.string(),
-            state: z.string(),
-          })
-        ),
-      },
-    },
-    async ({ date }) => {
-      try {
-        const data = await whoopClient.getHomeData(date);
+          async () => {
+                  try {
+                            const [cycleData, recoveryData, sleepData] = await Promise.all([
+                                        whoopClient.getLatestCycle(),
+                                        whoopClient.getLatestRecovery(),
+                                        whoopClient.getLatestSleep(),
+                                      ]);
+                            const cycle = cycleData.records?.[0];
+                            const recovery = recoveryData.records?.[0];
+                            const sleep = sleepData.records?.[0];
+                            const output = {
+                                        cycle: {
+                                                      id: cycle?.id ?? 0,
+                                                      start: cycle?.start ?? "",
+                                                      strain: cycle?.score?.strain ?? null,
+                                                      kilojoule: cycle?.score?.kilojoule ?? null,
+                                                      average_heart_rate: cycle?.score?.average_heart_rate ?? null,
+                                                      score_state: cycle?.score_state ?? "UNKNOWN",
+                                        },
+                                        recovery: {
+                                                      recovery_score: recovery?.score?.recovery_score ?? null,
+                                                      resting_heart_rate: recovery?.score?.resting_heart_rate ?? null,
+                                                      hrv_rmssd_milli: recovery?.score?.hrv_rmssd_milli ?? null,
+                                                      spo2_percentage: recovery?.score?.spo2_percentage ?? null,
+                                                      skin_temp_celsius: recovery?.score?.skin_temp_celsius ?? null,
+                                                      score_state: recovery?.score_state ?? "UNKNOWN",
+                                        },
+                                        sleep: {
+                                                      sleep_performance_percentage: sleep?.score?.sleep_performance_percentage ?? null,
+                                                      total_sleep_hours: sleep?.score?.stage_summary?.total_in_bed_time_milli
+                                                        ? (sleep.score.stage_summary.total_in_bed_time_milli - sleep.score.stage_summary.total_awake_time_milli) / 3600000
+                                                                      : null,
+                                                      respiratory_rate: sleep?.score?.respiratory_rate ?? null,
+                                                      score_state: sleep?.score_state ?? "UNKNOWN",
+                                        },
+                            };
+                            const lines = [
+                                        "WHOOP OVERVIEW", "=================", "",
+                                        `Cycle: ${cycle?.start?.split("T")[0] ?? "N/A"} (${output.cycle.score_state})`,
+                                        `Day Strain: ${output.cycle.strain?.toFixed(1) ?? "N/A"}`,
+                                        `Kilojoules: ${output.cycle.kilojoule?.toFixed(0) ?? "N/A"} kJ`,
+                                        `Avg HR: ${output.cycle.average_heart_rate ?? "N/A"} bpm`,
+                                        "", "RECOVERY", "-------i-m-p-o-r"t, 
+                              {   z   }   f r o m  `" z oSdc"o;r
+                              ei:m p$o{rotu ttpyupte. r{e cMocvpeSreyr.vreerc o}v efrryo_ms c"o@rmeo d?e?l c"oNn/tAe"x}t%p`r,o
+                    t o c o l / s d k / s`e r vHeRrV/:m c$p{.ojust"p;u
+                    ti.mrpeocrotv e{r yW.hhorovp_Crlmisesndt_ m}i lflrio?m. t"o.F.i/xwehdo(o1p)- c?l?i e"nNt/"A;"
+                    }
+                     emxsp`o,r
+                    t   f u n c t i o n  `r e gRiHsRt:e r$H{oomuetTpouotl.sr(esceorvveerry:. rMecsptSienrgv_ehre,a rwth_oroaptCel i?e?n t":N /WAh"o}o pbCplmi`e,n
+                    t )   { 
+                         s e r v`e r .SrpeOg2i:s t$e{roTuotoplu(t
+                         . r e c o"vwehroyo.ps_pgoe2t__poevrecrevniteawg"e,?
+                         . t o F i{x
+                         e d ( 1 )   ?t?i t"lNe/:A ""}G%e`t, 
+                           W h o o p   O v e r v`i e wS"k,i
+                           n   T e m p :d e$s{coruitpptuito.nr:e c"oGveetr yt.osdkaiyn'_st eWmhpo_ocpe losvieursv?i.etwo:F icxyecdl(e1 )s t?r?a i"nN,/ Ar"e}c oCv`e,r
+                      y   s c o r e ,   H R"V",,  R"HSRL,E EsPl"e,e p" -p-e-r-f-o-r-m-a-n"c,e
+                      " , 
+                                     i n`p u tPSecrhfeomram:a n{c}e,:
+                                       $ { o u t pouutt.psulteSecph.esmlae:e p{_
+                                       p e r f o r m a nccyec_lpee:r cze.notbajgeec t?(?{ 
+                                       " N / A " } % ` , 
+                          i d :   z . n u m b`e r (T)o,t
+                          a l   S l e e p :   $s{toaurttp:u tz..ssltereipn.gt(o)t,a
+                          l _ s l e e p _ h o usrtsr?a.itno:F izx.endu(m1b)e r?(?) ."nNu/lAl"a}b lher(s)`,,
 
-        const overviewPillar = data.pillars.find(
-          (p: any) => p.type === "OVERVIEW"
-        );
+                                            k`i l oRjeosuplier:a tzo.rnyu mRbaetre(:) .$n{uolultapbulte.(s)l,e
+                                            e p . r e s p i r a taovreyr_argaet_eh?e.atrotF_irxaetde(:1 )z .?n?u m"bNe/rA(")}. nruplml`a,b
+                      l e ( ) , 
+                              ] ; 
+                              s c o rree_tsutrant e{:
+                                z . s t r i n g ( )c,o
+                      n t e n t :   [ {} )t,y
+                                     p e :   " t e x tr"e,c otveexrty::  lzi.noebsj.ejcoti(n{(
+                        " \ n " )   } ] , 
+                        r e c o v e r y _ ssctorruec:t uzr.enduCmobnetre(n)t.:n uolultapbulte,(
+                      ) , 
+                      } ; 
+          r e s t i}n gc_ahtecahr t(_errartoer:)  z{.
+      n u m b e r ( ) .cnounlslta bmlseg( )=, 
+      e r r o r   i n s t ahnrcve_orfm sEsrdr_omri l?l ie:r rzo.rn.ummebsesra(g)e. n:u l"lUanbklneo(w)n, 
+      e r r o r " ; 
+            s p o 2 _ preertcuernnt a{g ec:o nzt.ennutm:b e[r{( )t.ynpuel:l a"btleex(t)",,
+        t e x t :   ` E r rsokri nf_ettecmhpi_ncge lWshiouosp:  ozv.enruvmibeewr (d)a.tnau:l l$a{bmlseg(})`, 
+      } ] ,   i s E r r o rs:c otrreu_es t}a;t
+  e :   z . s t}r
+i n g ( )},
 
-        const activities: any[] = [];
-        if (overviewPillar) {
-          for (const section of overviewPillar.sections) {
-            for (const item of section.items) {
-              if (item.type === "ITEMS_CARD" && item.content.items) {
-                for (const activity of item.content.items) {
-                  if (activity.type === "ACTIVITY") {
-                    activities.push({
-                      title: activity.content.title,
-                      type: activity.content.type,
-                      scoreDisplay: activity.content.score_display,
-                      startTime: activity.content.start_time_text,
-                      endTime: activity.content.end_time_text,
-                      status: activity.content.status,
-                    });
-                  }
-                }
+    ) ; 
+}   }),
+        sleep: z.object({
+                    sleep_performance_percentage: z.number().nullable(),
+                    total_sleep_hours: z.number().nullable(),
+                    respiratory_rate: z.number().nullable(),
+                    score_state: z.string(),
+        }),
+          },
+          },
+              async () => {
+                      try {
+                                const [cycleData, recoveryData, sleepData] = await Promise.all([
+                                            whoopClient.getLatestCycle(),
+                                            whoopClient.getLatestRecovery(),
+                                            whoopClient.getLatestSleep(),
+                                          ]);
+                                const cycle = cycleData.records?.[0];
+                                const recovery = recoveryData.records?.[0];
+                                const sleep = sleepData.records?.[0];
+                                const output = {
+                                            cycle: {
+                                                          id: cycle?.id ?? 0,
+                                                          start: cycle?.start ?? "",
+                                                          strain: cycle?.score?.strain ?? null,
+                                                          kilojoule: cycle?.score?.kilojoule ?? null,
+                                                          average_heart_rate: cycle?.score?.average_heart_rate ?? null,
+                                                          score_state: cycle?.score_state ?? "UNKNOWN",
+                                            },
+                                            recovery: {
+                                                          recovery_score: recovery?.score?.recovery_score ?? null,
+                                                          resting_heart_rate: recovery?.score?.resting_heart_rate ?? null,
+                                                          hrv_rmssd_milli: recovery?.score?.hrv_rmssd_milli ?? null,
+                                                          spo2_percentage: recovery?.score?.spo2_percentage ?? null,
+                                                          skin_temp_celsius: recovery?.score?.skin_temp_celsius ?? null,
+                                                          score_state: recovery?.score_state ?? "UNKNOWN",
+                                            },
+                                            sleep: {
+                                                          sleep_performance_percentage: sleep?.score?.sleep_performance_percentage ?? null,
+                                                          total_sleep_hours: sleep?.score?.stage_summary?.total_in_bed_time_milli
+                                                            ? (sleep.score.stage_summary.total_in_bed_time_milli - sleep.score.stage_summary.total_awake_time_milli) / 3600000
+                                                                          : null,
+                                                          respiratory_rate: sleep?.score?.respiratory_rate ?? null,
+                                                          score_state: sleep?.score_state ?? "UNKNOWN",
+                                            },
+                                };
+                                const lines = [
+                                            "WHOOP OVERVIEW", "=================", "",
+                                            `Cycle: ${cycle?.start?.split("T")[0] ?? "N/A"} (${output.cycle.score_state})`,
+                                            `Day Strain: ${output.cycle.strain?.toFixed(1) ?? "N/A"}`,
+                                            `Kilojoules: ${output.cycle.kilojoule?.toFixed(0) ?? "N/A"} kJ`,
+                                            `Avg HR: ${output.cycle.average_heart_rate ?? "N/A"} bpm`,
+                                            "", "RECOVERY", "-----------",
+                                            `  Score: ${output.recovery.recovery_score ?? "N/A"}%`,
+                                            `  HRV: ${output.recovery.hrv_rmssd_milli?.toFixed(1) ?? "N/A"} ms`,
+                                            `  RHR: ${output.recovery.resting_heart_rate ?? "N/A"} bpm`,
+                                            `  SpO2: ${output.recovery.spo2_percentage?.toFixed(1) ?? "N/A"}%`,
+                                            `  Skin Temp: ${output.recovery.skin_temp_celsius?.toFixed(1) ?? "N/A"} C`,
+                                            "", "SLEEP", "---------",
+                                            `  Performance: ${output.sleep.sleep_performance_percentage ?? "N/A"}%`,
+                                            `  Total Sleep: ${output.sleep.total_sleep_hours?.toFixed(1) ?? "N/A"} hrs`,
+                                            `  Respiratory Rate: ${output.sleep.respiratory_rate?.toFixed(1) ?? "N/A"} rpm`,
+                                          ];
+                                return {
+                                            content: [{ type: "text", text: lines.join("\n") }],
+                                            structuredContent: output,
+                                };
+                      } catch (error) {
+                                const msg = error instanceof Error ? error.message : "Unknown error";
+                                return { content: [{ type: "text", text: `Error fetching Whoop overview data: ${msg}` }], isError: true };
+                      }
               }
-            }
-          }
-        }
-
-        const statistics: any[] = [];
-        if (overviewPillar) {
-          for (const section of overviewPillar.sections) {
-            for (const item of section.items) {
-              if (item.type === "KEY_STATISTIC") {
-                statistics.push({
-                  title: item.content.title,
-                  currentValue: item.content.current_value_display,
-                  thirtyDayAverage: item.content.thirty_day_value_display,
-                  state: item.content.state,
-                });
-              }
-            }
-          }
-        }
-
-        const output = {
-          cycleInfo: {
-            cycleId: data.metadata.cycle_metadata.cycle_id,
-            cycleDay: data.metadata.cycle_metadata.cycle_day,
-            cycleDateDisplay: data.metadata.cycle_metadata.cycle_date_display,
-            sleepState: data.metadata.cycle_metadata.sleep_state,
-          },
-          liveMetrics: {
-            recoveryScore: data.metadata.whoop_live_metadata.recovery_score,
-            dayStrain: data.metadata.whoop_live_metadata.day_strain,
-            sleepHours:
-              data.metadata.whoop_live_metadata.ms_of_sleep / (1000 * 60 * 60),
-            calories: data.metadata.whoop_live_metadata.calories,
-          },
-          gauges: data.header.content.gauges.map((gauge) => ({
-            title: gauge.title,
-            scoreDisplay: gauge.score_display,
-            scoreSuffix: gauge.score_display_suffix,
-            fillPercentage: gauge.gauge_fill_percentage,
-            progressStyle: gauge.progress_fill_style,
-          })),
-          journal: {
-            completed: data.metadata.journal_metadata.journal_completed,
-            hasRecovery: data.metadata.journal_metadata.has_recovery,
-            enabled: data.metadata.journal_metadata.journal_enabled,
-          },
-          activities,
-          statistics,
-        };
-
-        const lines = ["🏠 WHOOP OVERVIEW", "═════════════════", ""];
-
-        lines.push(
-          `📅 Date: ${output.cycleInfo.cycleDay} (${output.cycleInfo.cycleDateDisplay})`,
-          `🔄 Cycle ID: ${output.cycleInfo.cycleId}`,
-          `💤 Sleep State: ${output.cycleInfo.sleepState}`,
-          "",
-          "📊 LIVE METRICS",
-          "───────────────",
-          `  Recovery: ${output.liveMetrics.recoveryScore}%`,
-          `  Strain: ${output.liveMetrics.dayStrain.toFixed(1)}`,
-          `  Sleep: ${output.liveMetrics.sleepHours.toFixed(1)} hours`,
-          `  Calories: ${output.liveMetrics.calories}`,
-          ""
-        );
-
-        if (output.gauges.length > 0) {
-          lines.push("🎯 SCORES", "─────────");
-          output.gauges.forEach((gauge) => {
-            lines.push(
-              `  ${gauge.title}: ${gauge.scoreDisplay}${gauge.scoreSuffix || ""} (${Math.round(gauge.fillPercentage * 100)}%)`
-            );
-          });
-          lines.push("");
-        }
-
-        if (activities.length > 0) {
-          lines.push("📋 TODAY'S ACTIVITIES", "─────────────────");
-          activities.forEach((activity, index) => {
-            lines.push(
-              `  ${index + 1}. ${activity.title} (${activity.type})`,
-              `     Score: ${activity.scoreDisplay}`,
-              `     Time: ${activity.startTime} - ${activity.endTime}`,
-              ""
-            );
-          });
-        }
-
-        if (statistics.length > 0) {
-          lines.push("📈 KEY STATISTICS", "─────────────────");
-          statistics.forEach((stat) => {
-            const stateEmoji = stat.state.includes("POSITIVE")
-              ? "✅"
-              : stat.state.includes("NEGATIVE")
-                ? "⚠️"
-                : "➡️";
-            lines.push(
-              `  ${stateEmoji} ${stat.title}`,
-              `     Current: ${stat.currentValue}`,
-              `     30-day avg: ${stat.thirtyDayAverage}`,
-              ""
-            );
-          });
-        }
-
-        const formattedText = lines.join("\n");
-
-        return {
-          content: [{ type: "text", text: formattedText }],
-          structuredContent: output,
-        };
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error fetching Whoop overview data: ${errorMessage}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
   );
 }
